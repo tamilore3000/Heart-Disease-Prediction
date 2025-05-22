@@ -37,6 +37,6 @@ The project is open to future enhancements, such as:
 
 ## About the Creator
 
-This project was created by Tamilore Olaogun in 2023. It aims to provide a valuable tool for healthcare professionals and researchers to predict heart disease presence in patients using state-of-the-art machine learning techniques.
+This project was created by Tamilore Olaogun. It aims to provide a valuable tool for healthcare professionals and researchers to predict heart disease presence in patients using state-of-the-art machine learning techniques.
 
 For any feedback, suggestions, or inquiries, feel free to reach out to Tamilore Olaogun at olaoguntamilore@gmail.com.
