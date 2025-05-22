@@ -9,7 +9,7 @@ The "Heart Disease Prediction using Machine Learning" app offers an intuitive us
 - **Multilayer Perceptron (MLP) Classifier:** A neural network model capable of learning complex relationships in the data.
 - **Logistic Regression:** A classic algorithm that models the probability of a binary outcome.
 - **Random Forest:** A powerful ensemble model that combines multiple decision trees for accurate predictions.
-- **XGBoost:** An optimized gradient boosting algorithm for high-performance predictions.
+- **XGBoost:** An optimised gradient boosting algorithm for high-performance predictions.
 - **Support Vector Machine (SVM):** A model that finds the best hyperplane to separate data points into different classes.
 
 ## Getting Started
@@ -31,7 +31,7 @@ To run the app locally, follow these steps:
 The project is open to future enhancements, such as:
 
 - Adding more machine learning models for comparison.
-- Incorporating advanced visualization tools for better data exploration.
+- Incorporating advanced visualisation tools for better data exploration.
 - Integrating user authentication and security measures.
 - Creating a web API for easier integration with other applications.
 
