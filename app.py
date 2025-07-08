@@ -1,177 +1,242 @@
 import streamlit as st
 import pandas as pd
-from streamlit_option_menu import option_menu
 import numpy as np
 import joblib
+from streamlit_option_menu import option_menu
+
+# --- PAGE CONFIGURATION ---
+st.set_page_config(
+    page_title="Heart Disease Prediction",
+    page_icon="❤️",
+    layout="centered",
+    initial_sidebar_state="expanded"
+)
+
+# --- CACHING MODEL AND DATA ---
+# Cache the model loading to avoid reloading on every interaction
+@st.cache_resource
+def load_model(model_path):
+    """Loads the trained machine learning model."""
+    model = joblib.load(model_path)
+    return model
+
+# Cache the data loading
+@st.cache_data
+def load_data(data_path):
+    """Loads the dataset."""
+    data = pd.read_csv(data_path)
+    return data
+
+# --- LOAD RESOURCES ---
+try:
+    model = load_model('xgb_best_model.joblib')
+    data = load_data('combined.csv')
+except FileNotFoundError:
+    st.error("Error: 'xgb_best_model.joblib' or 'combined.csv' not found.")
+    st.info("Please make sure the model and data files are in the same directory as the app script.")
+    st.stop()
 
 
+# --- FEATURE MAPPING DICTIONARIES ---
+# These mappings should be IDENTICAL to the ones used during model training
+SEX_MAP = {'M': 1, 'F': 0}
+CHEST_PAIN_MAP = {'ASY': 0, 'ATA': 1, 'NAP': 2, 'TA': 3}
+RESTING_ECG_MAP = {'Normal': 0, 'ST': 1, 'LVH': 2}
+EXERCISE_ANGINA_MAP = {'N': 0, 'Y': 1}
+ST_SLOPE_MAP = {'Up': 0, 'Flat': 1, 'Down': 2}
 
-# Load the trained model
-model = joblib.load('xgb_best_model.joblib')
-
-# Load the preprocessed dataset
-data = pd.read_csv('combined.csv')
-
-# Define the user interface
-st.set_page_config(page_title="Heart Disease Prediction", page_icon=":heart:")
-from PIL import Image
-
-with st.sidebar:
-    selected = option_menu('MENU',
-                          
-                          ['About',
-                           'Heart Disease Prediction',
-                           'Contact'],
-                          icons=['activity','heart','person'],
-                          default_index=0)
-
-
-if (selected == 'Heart Disease Prediction'):
-    # Set title
-    st.title('Heart Disease Prediction')
-
-    # Convert the 'Age' column to numeric
-    data['Age'] = pd.to_numeric(data['Age'], errors='coerce')
-
-    # Define the input fields in Streamlit
-    age = st.slider('Age', min_value=0, max_value=150, value=int(data['Age'].median()))
-    sex = st.selectbox('Sex', data['Sex'].unique())
-
-    # Replace the chest_pain_type_mapping with full text representation
-    chest_pain_type_dict = {
+# Dictionary for display text (more user-friendly)
+CHEST_PAIN_DISPLAY = {
     'ATA': 'Atypical Angina',
     'NAP': 'Non-Anginal Pain',
     'ASY': 'Asymptomatic',
     'TA': 'Typical Angina'
-    }
-    chest_pain_type = st.selectbox('Chest Pain Type', data['ChestPainType'].unique(), format_func=lambda x: chest_pain_type_dict[x])
-    
-    # Convert 'RestingBP' column to a NumPy array
-    resting_bp_values = data['RestingBP'].values
+}
+FASTING_BS_DISPLAY = {0: 'False (<= 120 mg/dl)', 1: 'True (> 120 mg/dl)'}
 
-    resting_bp = st.slider('Resting Blood Pressure', min_value=int(resting_bp_values.min()), max_value=int(resting_bp_values.max()), value=int(np.median(resting_bp_values)))
-    # Convert 'Cholesterol' column to a NumPy array
-    cholesterol_values = data['Cholesterol'].values
 
-    cholesterol = st.slider('Cholesterol', min_value=int(cholesterol_values.min()), max_value=int(cholesterol_values.max()), value=int(np.median(cholesterol_values)))
-    fasting_bs = st.selectbox('Fasting Blood Sugar', data['FastingBS'].unique())
-    resting_ecg = st.selectbox('Resting ECG', data['RestingECG'].unique())
-    # Convert 'MaxHR' column to a NumPy array
-    max_hr_values = data['MaxHR'].values
+# --- PREDICTION PAGE ---
+def prediction_page():
+    st.title("Heart Disease Prediction")
+    st.markdown("Enter the patient's details below to predict the likelihood of heart disease.")
+    st.markdown("---")
 
-    max_hr = st.slider('Maximum Heart Rate', min_value=int(max_hr_values.min()), max_value=int(max_hr_values.max()), value=int(np.median(max_hr_values)))
-    exercise_angina = st.selectbox('Exercise-Induced Angina', data['ExerciseAngina'].unique())
-    # Convert 'Oldpeak' column to a NumPy array
-    oldpeak_values = data['Oldpeak'].values
+    # Create columns for a cleaner layout
+    col1, col2, col3 = st.columns(3)
 
-    oldpeak = st.slider('ST Depression Induced by Exercise Relative to Rest', min_value=float(oldpeak_values.min()), max_value=float(oldpeak_values.max()), value=float(np.median(oldpeak_values)))
-    st_slope = st.selectbox('ST Slope', data['ST_Slope'].unique())
+    with col1:
+        age = st.slider(
+            'Age', 
+            min_value=20, max_value=80, value=54,
+            help="Patient's age in years."
+        )
+        sex_display = st.selectbox(
+            'Sex', 
+            options=['M', 'F'],
+            help="Patient's gender (M: Male, F: Female)."
+        )
+        chest_pain_type_display = st.selectbox(
+            'Chest Pain Type', 
+            options=list(CHEST_PAIN_DISPLAY.keys()),
+            format_func=lambda x: CHEST_PAIN_DISPLAY[x],
+            help="Type of chest pain experienced."
+        )
 
-    # Map the input values to preprocessed dataset values
-    sex_mapping = {'M': 0, 'F': 1}
-    chest_pain_type_mapping = {val: idx for idx, val in enumerate(data['ChestPainType'].unique())}
-    fasting_bs_mapping = {val: idx for idx, val in enumerate(data['FastingBS'].unique())}
-    resting_ecg_mapping = {val: idx for idx, val in enumerate(data['RestingECG'].unique())}
-    exercise_angina_mapping = {val: idx for idx, val in enumerate(data['ExerciseAngina'].unique())}
-    st_slope_mapping = {val: idx for idx, val in enumerate(data['ST_Slope'].unique())}
+    with col2:
+        resting_bp = st.slider(
+            'Resting Blood Pressure', 
+            min_value=80, max_value=200, value=130,
+            help="Resting blood pressure in mm Hg."
+        )
+        cholesterol = st.slider(
+            'Cholesterol', 
+            min_value=0, max_value=610, value=225,
+            help="Serum cholesterol in mg/dl. Note: 0 can indicate missing data in this dataset."
+        )
+        fasting_bs_display = st.selectbox(
+            'Fasting Blood Sugar > 120 mg/dl', 
+            options=[0, 1],
+            format_func=lambda x: FASTING_BS_DISPLAY[x],
+            help="Is the fasting blood sugar greater than 120 mg/dl?"
+        )
 
-    sex = sex_mapping[sex]
-    chest_pain_type = chest_pain_type_mapping[chest_pain_type]
-    fasting_bs = fasting_bs_mapping[fasting_bs]
-    resting_ecg = resting_ecg_mapping[resting_ecg]
-    exercise_angina = exercise_angina_mapping[exercise_angina]
-    st_slope = st_slope_mapping[st_slope]
+    with col3:
+        resting_ecg_display = st.selectbox(
+            'Resting ECG', 
+            options=list(RESTING_ECG_MAP.keys()),
+            help="Resting electrocardiogram results."
+        )
+        max_hr = st.slider(
+            'Maximum Heart Rate', 
+            min_value=60, max_value=202, value=140,
+            help="Maximum heart rate achieved during exercise."
+        )
+        exercise_angina_display = st.selectbox(
+            'Exercise-Induced Angina', 
+            options=['N', 'Y'],
+            help="Did the patient experience angina during exercise? (Y: Yes, N: No)."
+        )
 
-    # Create a feature vector from the input values
-    input_data = np.array([[age, sex, chest_pain_type, resting_bp, cholesterol, fasting_bs,
-                            resting_ecg, max_hr, exercise_angina, oldpeak, st_slope]])
+    # Sliders for continuous values that need more space
+    oldpeak = st.slider(
+        'ST Depression (Oldpeak)', 
+        min_value=-3.0, max_value=7.0, value=1.0, step=0.1,
+        help="ST depression induced by exercise relative to rest."
+    )
+    st_slope_display = st.selectbox(
+        'ST Slope', 
+        options=list(ST_SLOPE_MAP.keys()),
+        help="The slope of the peak exercise ST segment."
+    )
 
-    # Define the prediction button
-    if st.button('Predict Heart Disease'):
-        # Make the prediction
-        prediction = model.predict(input_data)
-        
-        # Display the prediction result
-        if prediction[0] == 1:
-            st.write('There is a heart disease.')
+    st.markdown("---")
+
+    # Prediction button
+    if st.button('**Predict Heart Disease**', use_container_width=True):
+        # Map user inputs to the numerical format required by the model
+        sex = SEX_MAP[sex_display]
+        chest_pain_type = CHEST_PAIN_MAP[chest_pain_type_display]
+        fasting_bs = int(fasting_bs_display)
+        resting_ecg = RESTING_ECG_MAP[resting_ecg_display]
+        exercise_angina = EXERCISE_ANGINA_MAP[exercise_angina_display]
+        st_slope = ST_SLOPE_MAP[st_slope_display]
+
+        # Create the feature vector for prediction
+        input_data = np.array([[
+            age, sex, chest_pain_type, resting_bp, cholesterol, fasting_bs,
+            resting_ecg, max_hr, exercise_angina, oldpeak, st_slope
+        ]])
+
+        # Make the prediction and get probability
+        prediction = model.predict(input_data)[0]
+        prediction_proba = model.predict_proba(input_data)[0]
+
+        # Display the result
+        st.markdown("### Prediction Result")
+        if prediction == 1:
+            probability = prediction_proba[1] * 100
+            st.error(f"**Result: High Risk of Heart Disease**", icon="💔")
+            st.metric(
+                label="Probability of Heart Disease",
+                value=f"{probability:.2f}%"
+            )
+            st.progress(float(probability / 100))
+
         else:
-            st.write('There is no heart disease.')
+            probability = prediction_proba[0] * 100
+            st.success(f"**Result: Low Risk of Heart Disease**", icon="❤️")
+            st.metric(
+                label="Probability of Not Having Heart Disease",
+                value=f"{probability:.2f}%"
+            )
+            st.progress(float(probability / 100))
 
-def app():
-    st.title("Contact")
 
-    st.write('''
-    ----
-    *Thank you for using the Heart Disease Prediction using ML app! If you have any feedback or suggestions, please feel free to reach out to us.*
+        st.info("**Disclaimer:** This prediction is based on a machine learning model and is not a substitute for professional medical advice. Please consult a doctor for any health concerns.")
 
-    **Contact Information:**
 
-    **Email:** olaoguntamilore@gmail.com
+# --- ABOUT PAGE ---
+def about_page():
+    st.title("About This Project")
+    st.markdown('''
+    This application is a tool for predicting the presence of heart disease in patients based on various health parameters. By leveraging a powerful XGBoost machine learning model, it aims to assist medical professionals and inform individuals about potential risks.
 
-    **Github** https://github.com/tamilore3000
-
-    
-    ''')
-
-if (selected == 'About'):
-
-    st.title("About Heart Disease Prediction Using Machine Learning")
-    st.write('''
-    ----
-    ## Welcome to the "Heart Disease Prediction Using Machine Learning" App!
-
-    This app is designed to provide a powerful tool for predicting the presence of heart disease in patients based on various health parameters. By leveraging machine learning techniques, I aim to assist medical professionals in making accurate predictions about heart health.
-
-    ### Project Overview:
-
-    In the pursuit of creating an effective heart disease prediction model, I have utilized a diverse dataset containing a wide range of health metrics. By analyzing and understanding the relationship between these metrics and the presence of heart disease, I've developed a robust machine learning model.
-
-    ### Dataset Description:
-
-    The dataset used in this project contains information about various health parameters of patients. Here's a breakdown of the dataset columns:
+    ### Dataset Used
+    The model was trained on a combined dataset from multiple sources, containing the following features:
 
     - **Age:** Age of the patient [years]
-    - **Sex:** Sex of the patient [Male, Female]
-    - **ChestPainType:** Chest pain type [Typical Angina, Atypical Angina, Non-Anginal Pain, Asymptomatic]
+    - **Sex:** Sex of the patient [M, F]
+    - **ChestPainType:** [TA, ATA, NAP, ASY]
     - **RestingBP:** Resting blood pressure [mm Hg]
     - **Cholesterol:** Serum cholesterol [mm/dl]
-    - **FastingBS:** Fasting blood sugar [1: if FastingBS > 120 mg/dl, 0: otherwise]
-    - **RestingECG:** Resting electrocardiogram results [Normal: Normal, ST-T wave abnormality, Left Ventricular Hypertrophy (LVH)]
-    - **MaxHR:** Maximum heart rate achieved [Numeric value between 60 and 202]
-    - **ExerciseAngina:** Exercise-induced angina [Yes, No]
-    - **Oldpeak:** ST depression induced by exercise relative to rest [Numeric value measured in depression]
-    - **ST_Slope:** The slope of the peak exercise ST segment [Upsloping, Flat, Downsloping]
+    - **FastingBS:** Fasting blood sugar > 120 mg/dl [1: true; 0: false]
+    - **RestingECG:** [Normal, ST, LVH]
+    - **MaxHR:** Maximum heart rate achieved [60-202]
+    - **ExerciseAngina:** Exercise-induced angina [Y, N]
+    - **Oldpeak:** ST depression induced by exercise
+    - **ST_Slope:** Slope of the peak exercise ST segment [Up, Flat, Down]
     - **HeartDisease:** Output class [1: heart disease, 0: Normal]
 
-    ### Machine Learning Models:
+    ### The Model
+    After evaluating several models, including Logistic Regression, Random Forest, and SVM, an **XGBoost (Extreme Gradient Boosting)** classifier was selected for its high accuracy and robustness in handling this type of data. The model has been fine-tuned to provide the most reliable predictions possible.
 
-    The "Heart Disease Prediction Using Machine Learning" app employs the following machine learning models:
-
-    - **Multilayer Perceptron (MLP) Classifier:** A neural network model capable of learning complex relationships in the data.
-    - **Random Forest:** A powerful ensemble model that combines multiple decision trees for accurate predictions.
-    - **XGBoost:** An optimized gradient boosting algorithm for high-performance predictions.
-    - **Support Vector Machine (SVM):** A model that finds the best hyperplane to separate data points into different classes.
-
-    After rigorous evaluation and tuning, the best-performing model was selected and deployed to make predictions within this app.
-
-    ### Future Enhancements:
-
-    While the current version of the app is already a valuable tool, potential future enhancements could include:
-
-    - Integration of additional health metrics for even more accurate predictions.
-    - Incorporation of interpretability techniques to provide insights into the model's decision-making process.
-    - User-friendly visualizations to better understand the importance of different features in predictions.
-    - Real-time updates and feedback based on the latest research and medical advancements.
-
-    Thank you for using the "Heart Disease Prediction Using Machine Learning" app. If you have any feedback, questions, or suggestions, please don't hesitate to reach out to me using the contact information provided.
-    *About the Creator:*
-
-    *The "Heart Disease Prediction Using Machine Learning" app was created by Tamilore Olaogun in 2023.*
+    ---
+    *This app was created by Tamilore Olaogun in 2023.*
     ''')
 
-    # Button to go to the "Contact" page
-    if st.button("Contact Us"):
-        app()
+# --- CONTACT PAGE ---
+def contact_page():
+    st.title("Contact Information")
+    st.markdown('''
+    Thank you for using the Heart Disease Prediction app! If you have any feedback, questions, or suggestions, please feel free to reach out.
 
-if (selected == 'Contact'):
-    app()
+    **Creator:** Tamilore Olaogun
+
+    **Email:** [olaoguntamilore@gmail.com](mailto:olaoguntamilore@gmail.com)
+
+    **GitHub:** [github.com/tamilore3000](https://github.com/tamilore3000)
+    ''')
+
+
+# --- MAIN APP LOGIC ---
+def main():
+    # Sidebar menu
+    with st.sidebar:
+        selected = option_menu(
+            'Main Menu',
+            ['Prediction', 'About', 'Contact'],
+            icons=['heart-pulse', 'info-circle', 'person-rolodex'],
+            menu_icon="cast",
+            default_index=0
+        )
+
+    # Page routing
+    if selected == 'Prediction':
+        prediction_page()
+    elif selected == 'About':
+        about_page()
+    elif selected == 'Contact':
+        contact_page()
+
+if __name__ == "__main__":
+    main()
